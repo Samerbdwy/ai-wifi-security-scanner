@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wi-Fi Security Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <div class="logo-icon"><i class="fas fa-wifi"></i></div>
+                <div class="logo-text">
+                    <h1>WI-FI SECURITY SCANNER</h1>
+                    <p>Rogue AP Detection & Security Analysis</p>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="main-container">
+        <div class="header">
+            <h2><i class="fas fa-shield-alt"></i> AI-Powered Wi-Fi Security Scanner</h2>
+            <p>Scan nearby networks, detect rogue access points, and get AI-powered security insights</p>
+        </div>
+        
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-search"></i> Scan Networks</h3>
+                </div>
+                <div class="card-body">
+                    <div class="warning-badge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; border-radius: 12px; padding: 12px; margin-bottom: 20px;">
+                        <i class="fas fa-info-circle" style="color: #f59e0b;"></i>
+                        <small style="color: #f59e0b;">Note: Scan will temporarily disconnect Wi-Fi to detect ALL networks (auto-reconnects)</small>
+                    </div>
+                    <button class="btn-primary" id="scanBtn" onclick="scanWiFi()">
+                        <i class="fas fa-sync-alt"></i> Scan Wi-Fi Networks
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-pie"></i> Results</h3>
+                </div>
+                <div class="card-body" id="resultsContainer">
+                    <div class="empty-state">
+                        <i class="fas fa-wifi"></i>
+                        <p>Click "Scan Wi-Fi Networks" to start</p>
+                        <small>AI will analyze nearby networks and detect rogue access points</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <i class="fas fa-shield-alt"></i> AI-Powered Wi-Fi Security Scanner | Rogue AP Detection · Encryption Analysis · AI Insights
+        </div>
+    </div>
+    
+    <script>
+        let lastScanTime = 0;
+        const SCAN_DELAY = 15000; // 15 seconds delay for API rate limit
+        
+        async function scanWiFi() {
+            const resultsDiv = document.getElementById('resultsContainer');
+            const scanBtn = document.getElementById('scanBtn');
+            
+            // Check rate limit
+            const now = Date.now();
+            if (lastScanTime && (now - lastScanTime) < SCAN_DELAY) {
+                const remaining = Math.ceil((SCAN_DELAY - (now - lastScanTime)) / 1000);
+                resultsDiv.innerHTML = `<div class="empty-state"><i class="fas fa-hourglass-half"></i><p>Please wait ${remaining} seconds before scanning again</p><small>Free API limit: 5 requests per minute</small></div>`;
+                return;
+            }
+            
+            lastScanTime = now;
+            
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
+            
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Scanning for Wi-Fi networks...</p>
+                </div>
+            `;
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch('/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trusted_ssids: [] })
+                });
+                
+                const data = await response.json();
+                const scanTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                
+                if (data.success) {
+                    let html = `
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-number">${data.count}</div>
+                                <div class="stat-label">Networks Found (${scanTime}s)</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" style="color: #ef4444;">${data.rogue_count}</div>
+                                <div class="stat-label">Rogue APs Detected</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number">${data.encryption_stats.WPA2 + data.encryption_stats.WPA3}</div>
+                                <div class="stat-label">Secure Networks (WPA2+)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card" style="margin-bottom: 16px;">
+                            <div class="card-header">
+                                <h3><i class="fas fa-brain"></i> AI Security Insights</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="line-height: 1.6;">${escapeHtml(data.ai_insights) || 'Analysis complete'}</p>
+                                <small style="color: #5a6874; display: block; margin-top: 10px;">⏱️ Rate limit: 5 scans per minute. Please wait 15 seconds between scans.</small>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-list"></i> Detected Networks</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="network-list">
+                    `;
+                    
+                    for (const network of data.networks.slice(0, 50)) {
+                        let securityClass = 'Open';
+                        if (network.security) {
+                            if (network.security.includes('WPA3')) securityClass = 'WPA3';
+                            else if (network.security.includes('WPA2')) securityClass = 'WPA2';
+                            else if (network.security.includes('WPA')) securityClass = 'WPA';
+                            else if (network.security.includes('WEP')) securityClass = 'WEP';
+                        }
+                        
+                        html += `
+                            <div class="network-item">
+                                <div>
+                                    <i class="fas fa-wifi"></i>
+                                    <strong>${escapeHtml(network.ssid) || 'Hidden Network'}</strong>
+                                    ${network.rogue_reasons ? '<span class="rogue-badge"><i class="fas fa-exclamation-triangle"></i> ROGUE</span>' : ''}
+                                    <br>
+                                    <small style="color: #5a6874;">
+                                        ${escapeHtml(network.security) || 'Unknown'} | 
+                                        Signal: ${network.signal || 'N/A'} |
+                                        ${network.band || network.frequency || '2.4GHz'}
+                                    </small>
+                                </div>
+                                <span class="security-badge security-${securityClass}">${securityClass}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    if (data.networks.length === 0) {
+                        html += `<div style="text-align: center; padding: 40px; color: #5a6874;">No networks found. Make sure Wi-Fi is enabled.</div>`;
+                    }
+                    
+                    html += `</div></div></div>`;
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i><p>${escapeHtml(data.error || 'Scan failed')}</p></div>`;
+                }
+            } catch (error) {
+                console.error('Scan error:', error);
+                resultsDiv.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i><p>Error: Make sure backend is running on port 5005</p><small>Run: python app.py</small></div>`;
+            } finally {
+                scanBtn.disabled = false;
+                scanBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Scan Wi-Fi Networks';
+            }
+        }
+        
+        // Helper function to escape HTML special characters
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+    </script>
+</body>
+</html>
