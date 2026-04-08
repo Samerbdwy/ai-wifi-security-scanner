@@ -45,7 +45,7 @@ Works on any Windows network with Wi-Fi enabled.
 
 ## 🎥 Demo
 
-[Demo Video]()
+[Demo Video](https://drive.google.com/drive/folders/1daQBp753FPPk-g1hS7lh2WrXHW_vp9dS)
 
 ---
 
